@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jeu de l'oie</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>🪿 Jeu de l'oie</h1>
+
+  <!-- Écran de départ -->
+  <section id="ecran-depart">
+    <label for="nb-equipes">Nombre d'équipes (2 à 10) :</label>
+    <input type="number" id="nb-equipes" min="2" max="10" value="2">
+    <button id="btn-lancer">Lancer le jeu</button>
+    <p id="erreur"></p>
+  </section>
+
+  <!-- Écran de jeu -->
+  <section id="ecran-jeu" class="cache">
+    <div id="depart-zone"></div>
+    <div id="plateau"></div>
+
+    <div id="panneau">
+      <h2 id="tour"></h2>
+      <div id="de">🎲</div>
+      <button id="btn-de">Lancer le dé</button>
+      <div id="cartes"></div>
+      <h3>Équipes</h3>
+      <ul id="liste-equipes"></ul>
+      <h3>Journal</h3>
+      <div id="journal"></div>
+      <button id="btn-rejouer" class="cache">Nouvelle partie</button>
+    </div>
+  </section>
+
+  <script src="script.js"></script>
+</body>
+</html>
