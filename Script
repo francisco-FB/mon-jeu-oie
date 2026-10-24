@@ -1,0 +1,257 @@
+// ===== Constantes =====
+const NB_CASES = 63;
+const COLONNES = 9;
+const COULEURS = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4",
+                  "#008080", "#9a6324", "#808000", "#000075", "#f032e6"];
+
+const OIES = [5, 9, 14, 18, 23, 27, 32, 36, 41, 45, 50, 54, 59];
+const CASES_CARTES = [8, 20, 35, 48, 56];
+const PONT = 6;          // 6 -> 12
+const PUITS = 31;        // passe 2 tours
+const LABYRINTHE = 42;   // retour case 30
+const PRISON = 52;       // passe 2 tours
+const TETE_MORT = 58;    // retour départ
+
+const CARTES = [
+  { nom: "Avance de 3", id: "avance" },
+  { nom: "Passe-tour adverse", id: "passe" },
+  { nom: "Bouclier (annule un piège)", id: "bouclier" },
+  { nom: "Rejoue", id: "rejoue" }
+];
+
+// ===== État du jeu =====
+let equipes = [];
+let courante = 0;
+let rejoue = false;
+let fini = false;
+
+// ===== Éléments =====
+const $ = (id) => document.getElementById(id);
+
+// ===== Démarrage =====
+$("btn-lancer").addEventListener("click", () => {
+  const n = parseInt($("nb-equipes").value);
+  if (isNaN(n) || n < 2 || n > 10) {
+    $("erreur").textContent = "Choisis un nombre entre 2 et 10.";
+    return;
+  }
+  demarrer(n);
+});
+$("btn-de").addEventListener("click", lancerDe);
+$("btn-rejouer").addEventListener("click", () => location.reload());
+
+function demarrer(n) {
+  equipes = [];
+  for (let i = 0; i < n; i++) {
+    equipes.push({ nom: "Équipe " + (i + 1), couleur: COULEURS[i], pos: 0, cartes: [], skip: 0 });
+  }
+  courante = 0;
+  rejoue = false;
+  fini = false;
+  $("ecran-depart").classList.add("cache");
+  $("ecran-jeu").classList.remove("cache");
+  $("journal").innerHTML = "";
+  construirePlateau();
+  log("La partie commence !");
+  afficher();
+}
+
+// ===== Plateau =====
+// numéro de la case selon la ligne (serpentin)
+function numeroCase(ligne, col) {
+  return ligne % 2 === 0 ? ligne * COLONNES + col + 1 : ligne * COLONNES + (COLONNES - col);
+}
+
+function construirePlateau() {
+  const plateau = $("plateau");
+  plateau.innerHTML = "";
+  for (let l = 0; l < NB_CASES / COLONNES; l++) {
+    for (let c = 0; c < COLONNES; c++) {
+      const n = numeroCase(l, c);
+      const div = document.createElement("div");
+      div.className = "case";
+      div.id = "case-" + n;
+      let icone = "";
+      if (OIES.includes(n)) { div.classList.add("oie"); icone = "🪿"; }
+      else if (n === PONT) { div.classList.add("pont"); icone = "🌉"; }
+      else if (n === PUITS) { div.classList.add("piege"); icone = "🕳️"; }
+      else if (n === LABYRINTHE) { div.classList.add("piege"); icone = "🌀"; }
+      else if (n === PRISON) { div.classList.add("piege"); icone = "⛓️"; }
+      else if (n === TETE_MORT) { div.classList.add("piege"); icone = "💀"; }
+      else if (CASES_CARTES.includes(n)) { div.classList.add("carte"); icone = "🃏"; }
+      else if (n === NB_CASES) { div.classList.add("arrivee"); icone = "🏆"; }
+      div.innerHTML = '<span class="num">' + n + '</span><span class="icone">' + icone +
+                      '</span><div class="pions"></div>';
+      plateau.appendChild(div);
+    }
+  }
+}
+
+function pionHTML(i) {
+  const e = equipes[i];
+  return '<span class="pion" style="background:' + e.couleur + '" title="' + e.nom + '">' + (i + 1) + '</span>';
+}
+
+// ===== Affichage =====
+function afficher() {
+  // pions
+  document.querySelectorAll(".pions").forEach((p) => (p.innerHTML = ""));
+  $("depart-zone").innerHTML = "<b>Départ : </b>";
+  equipes.forEach((e, i) => {
+    if (e.pos === 0) {
+      $("depart-zone").innerHTML += pionHTML(i);
+    } else {
+      document.querySelector("#case-" + e.pos + " .pions").innerHTML += pionHTML(i);
+    }
+  });
+
+  // panneau
+  const e = equipes[courante];
+  $("tour").textContent = fini ? "Partie terminée" : "Tour : " + e.nom;
+  $("tour").style.color = e.couleur;
+  $("btn-de").disabled = fini;
+
+  // cartes de l'équipe courante
+  $("cartes").innerHTML = "";
+  if (!fini) {
+    e.cartes.forEach((carte, k) => {
+      if (carte.id === "bouclier") return; // utilisé automatiquement sur un piège
+      const b = document.createElement("button");
+      b.textContent = "🃏 " + carte.nom;
+      b.onclick = () => utiliserCarte(k);
+      $("cartes").appendChild(b);
+    });
+    const nbBouclier = e.cartes.filter((c) => c.id === "bouclier").length;
+    if (nbBouclier > 0) {
+      $("cartes").innerHTML += "<div>🛡️ Boucliers : " + nbBouclier + "</div>";
+    }
+  }
+
+  // liste des équipes
+  $("liste-equipes").innerHTML = "";
+  equipes.forEach((eq, i) => {
+    const li = document.createElement("li");
+    li.innerHTML = pionHTML(i) + " " + eq.nom + " — case " + eq.pos +
+                   " — cartes : " + eq.cartes.length + (eq.skip > 0 ? " (⏸ " + eq.skip + ")" : "");
+    $("liste-equipes").appendChild(li);
+  });
+}
+
+function log(message) {
+  const j = $("journal");
+  j.innerHTML += "<div>" + message + "</div>";
+  j.scrollTop = j.scrollHeight;
+}
+
+// ===== Règles =====
+function lancerDe() {
+  if (fini) return;
+  const de = Math.floor(Math.random() * 6) + 1;
+  $("de").textContent = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"][de - 1];
+  const e = equipes[courante];
+  log(e.nom + " lance le dé : " + de);
+  deplacer(courante, de, de);
+  finDeTour();
+}
+
+function deplacer(i, n, de) {
+  const e = equipes[i];
+  let p = e.pos + n;
+  if (p > NB_CASES) {
+    p = NB_CASES - (p - NB_CASES); // rebond
+    log(e.nom + " rebondit sur la case 63 !");
+  }
+  e.pos = p;
+  log(e.nom + " va sur la case " + p + ".");
+  resoudre(i, de);
+}
+
+function piege(i, message, action) {
+  const e = equipes[i];
+  const k = e.cartes.findIndex((c) => c.id === "bouclier");
+  if (k >= 0 && confirm(e.nom + " : " + message + "\nUtiliser votre bouclier pour annuler ?")) {
+    e.cartes.splice(k, 1);
+    log(e.nom + " utilise son bouclier 🛡️ : piège annulé.");
+    return;
+  }
+  log(message);
+  action();
+}
+
+function resoudre(i, de) {
+  const e = equipes[i];
+  const p = e.pos;
+
+  if (p === NB_CASES) {
+    fini = true;
+    log("🏆 " + e.nom + " gagne la partie !");
+    $("btn-rejouer").classList.remove("cache");
+    return;
+  }
+  if (OIES.includes(p)) {
+    log("🪿 Case oie ! " + e.nom + " avance encore et rejoue.");
+    rejoue = true;
+    if (de > 0) deplacer(i, de, de);
+  } else if (p === PONT) {
+    log("🌉 Pont : " + e.nom + " file à la case 12.");
+    e.pos = 12;
+  } else if (p === PUITS) {
+    piege(i, "🕳️ " + e.nom + " tombe dans le puits (passe 2 tours).", () => (e.skip = 2));
+  } else if (p === LABYRINTHE) {
+    piege(i, "🌀 " + e.nom + " se perd dans le labyrinthe (retour case 30).", () => (e.pos = 30));
+  } else if (p === PRISON) {
+    piege(i, "⛓️ " + e.nom + " va en prison (passe 2 tours).", () => (e.skip = 2));
+  } else if (p === TETE_MORT) {
+    piege(i, "💀 " + e.nom + " retourne au départ !", () => (e.pos = 0));
+  } else if (CASES_CARTES.includes(p)) {
+    const carte = CARTES[Math.floor(Math.random() * CARTES.length)];
+    e.cartes.push(carte);
+    log("🃏 " + e.nom + " pioche la carte : " + carte.nom);
+  }
+}
+
+function utiliserCarte(k) {
+  const e = equipes[courante];
+  const carte = e.cartes[k];
+  if (carte.id === "avance") {
+    e.cartes.splice(k, 1);
+    log(e.nom + " joue « Avance de 3 ».");
+    deplacer(courante, 3, 0);
+  } else if (carte.id === "rejoue") {
+    e.cartes.splice(k, 1);
+    rejoue = true;
+    log(e.nom + " joue « Rejoue » : elle rejouera après ce lancer.");
+  } else if (carte.id === "passe") {
+    const rep = prompt("Quelle équipe passe son tour ? (numéro)");
+    const cible = parseInt(rep) - 1;
+    if (isNaN(cible) || cible < 0 || cible >= equipes.length || cible === courante) {
+      alert("Numéro invalide.");
+      return;
+    }
+    e.cartes.splice(k, 1);
+    equipes[cible].skip += 1;
+    log(e.nom + " joue « Passe-tour » sur " + equipes[cible].nom + ".");
+  }
+  afficher();
+}
+
+function finDeTour() {
+  if (!fini) {
+    if (rejoue) {
+      rejoue = false;
+      log(equipes[courante].nom + " rejoue !");
+    } else {
+      do {
+        courante = (courante + 1) % equipes.length;
+        const e = equipes[courante];
+        if (e.skip > 0) {
+          e.skip--;
+          log(e.nom + " passe son tour.");
+        } else {
+          break;
+        }
+      } while (true);
+    }
+  }
+  afficher();
+}
