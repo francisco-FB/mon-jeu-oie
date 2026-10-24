@@ -1,4 +1,4 @@
-# Jeu de l'oie personnalisable
+# Jeu de l'oie TP
 
 ## Fonctionnalités attendues
 - Saisir le nombre d'équipes (entre 2 et 10)
